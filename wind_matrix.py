@@ -11,31 +11,99 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
+from typing import Optional
 
 
-def genWindMatrix(out_path: str,
-                  ws_array: np.ndarray,
+def calcWindSpeedPercentilesByDirection(ws_array: np.ndarray,
+                                       wd_array: np.ndarray,
+                                       percentiles: list,
+                                       wd_bin_width: int = 45,
+                                       out_path: Optional[str] = None) -> pd.DataFrame:
+    """
+    Function to calculate wind speed percentiles for winds that are grouped by direction.
+    The wd_bin_width determines how the wind directions are grouped into bins.
+
+    :param ws_array: an array of wind speed values (dimensions must match wd_array)
+    :param wd_array: an array of wind direction values (dimensions must match ws_array)
+    :param percentiles: a list of percentile values to calculate
+    :param wd_bin_width: the width/size (number of degrees) used for the wind direction bins
+    :param out_path: optional, the path to save the output CSV file
+    :return: a Pandas DataFrame with wind speed percentiles for each wind direction bin
+    """
+    # Check that the input arrays have matching dimensions
+    if len(ws_array) != len(wd_array):
+        raise ValueError("Wind speed and wind direction arrays must have the same length.")
+
+    # Calculate the wind direction bins using the provided formula
+    bin_labels = [val for val in range(0, 360 + wd_bin_width, wd_bin_width)]
+    bins = ([0] +
+            [int((x * wd_bin_width) / 2) for x in range(1, int(360 / wd_bin_width) * 2)
+             if int((x * wd_bin_width) / 2) % wd_bin_width != 0] +
+            [360])
+
+    # Create a DataFrame from the input arrays
+    df = pd.DataFrame({
+        'wind_speed': ws_array,
+        'wind_direction': wd_array
+    })
+
+    # Bin the wind directions using the computed bins
+    df['wind_direction_bin'] = pd.cut(df['wind_direction'],
+                                      bins=bins,
+                                      labels=bins[:-1],
+                                      right=False,
+                                      include_lowest=True)
+
+    # Group by wind direction bins and calculate the requested percentiles for wind speeds
+    result = df.groupby('wind_direction_bin',
+                        observed=True)['wind_speed'].quantile([p / 100 for p in percentiles]).unstack()
+
+    # Rename columns to reflect the percentiles
+    result.columns = [f'{int(p)}th_percentile' for p in percentiles]
+
+    # Replace the index with the bin labels
+    result.index = bin_labels
+
+    # Merge the first bin (0°) with the last bin (360°)
+    # Since 0 and 360 are the same direction, we'll combine the bins
+    if 0 in result.index and 360 in result.index:
+        result.loc[360] += result.loc[0]
+        result = result.drop(0)  # Remove the redundant 360° bin
+
+    # If an output path is provided, save the result to a CSV file
+    if out_path:
+        result.to_csv(out_path)
+
+    return result
+
+
+def genWindMatrix(ws_array: np.ndarray,
                   wd_array: np.ndarray,
                   ws_units: str,
                   ws_bin_width: int,
                   wd_bin_width: int,
-                  dir_labels: list = None,
-                  gen_wind_rose: bool = False) -> None:
+                  dir_labels: Optional[list] = None,
+                  out_matrix: str = '',
+                  gen_wind_rose: bool = False,
+                  out_rose: str = '') -> pd.DataFrame:
     """
     Function to generate a wind matrix from wind speed and direction data
-    :param out_path: path to save the wind matrix as a csv
     :param ws_array: an array of wind speed values (dimensions must match wd_array)
     :param wd_array: an array of wind direction values (dimensions must match ws_array)
     :param ws_units: the wind speed units - Options: ['kph', 'mph']
     :param ws_bin_width: the wind speed bin values
     :param wd_bin_width: the wind direction bin values
-    :param dir_labels: the labels of the wind direction bin values
-    :param gen_wind_rose: generate a wind rose figure from the data
-    :return: None
+    :param dir_labels: the labels of the wind direction bin values (optional).
+    :param out_matrix: path to save the wind matrix as a csv (optional).
+        If no path is provided, a wind matrix csv will not be generated.
+    :param gen_wind_rose: if True, a wind rose plot will be generated (optional)
+    :param out_rose: the path to save the wind rose plot (optional).
+        Plot extension options: ['.png', '.pdf', '.svg', '.ps', '.eps', '.jpg', '.tif/.tiff']
+    :return: a Pandas Dataframe of the results
     """
     # X-axis labels/bins (wind direction - degrees)
     if dir_labels is None:
-        dir_labels = [x for x in range(0, 360 + wd_bin_width, wd_bin_width)]
+        dir_labels = [x for x in range(0, 360 + wd_bin_width, wd_bin_width)][1:]
     dir_bins = [int((x * wd_bin_width) / 2) for x in range(0, 1 + int(360 / wd_bin_width) * 2)]
 
     # Y-axis bins/labels (wind speed)
@@ -74,24 +142,28 @@ def genWindMatrix(out_path: str,
     num_wnd_obs = np.sum(wind_array)
     # Convert windArray into probability matrix
     wind_matrix = 100 * wind_array / num_wnd_obs
-    wind_matrix = wind_matrix[:len(spd_bins), :len(dir_labels) - 1]
+    wind_matrix = wind_matrix[:len(spd_bins), :len(dir_labels)]
 
     # Round all values to the nearest 0.01
     wind_matrix = np.round(wind_matrix, 2)
 
-    # Save the data to csv
+    # Convert the wind matrix to a Pandas Dataframe
     wind_df = pd.DataFrame(wind_matrix,
                            index=spd_bins[1:],
-                           columns=dir_labels[1:])
-    wind_df.to_csv(out_path, sep=',')
+                           columns=dir_labels)
+
+    if out_matrix:
+        # Save the data to csv
+        wind_df.to_csv(out_matrix, sep=',')
 
     if gen_wind_rose:
+        # Generate the wind rose plot
         genWindRose(wind_data=wind_df,
                     ws_units=ws_units,
-                    dir_bins=dir_labels[1:],
-                    out_path=out_path.replace('.csv', '.png'))
+                    dir_bins=dir_labels,
+                    out_path=out_rose)
 
-    return
+    return wind_df
 
 
 def _adjust_colormap_lightness(cmap: LinearSegmentedColormap,
@@ -121,20 +193,20 @@ def _adjust_colormap_lightness(cmap: LinearSegmentedColormap,
 def genWindRose(wind_data: pd.DataFrame,
                 ws_units: str,
                 dir_bins: list,
-                out_path: str = None,
-                colormap: str = 'Blues',
-                lightness_factor: float = 0.85) -> None:
+                out_path: Optional[str] = '',
+                colormap: Optional[str] = 'Blues',
+                lightness_factor: Optional[float] = 0.85) -> None:
     """
     Function to generate a wind rose from a wind matrix dataset with custom polar plotting.
-    Wind data should be in the format where rows are wind speeds and columns are wind directions..
+    Wind data should be in the format where rows are wind speeds and columns are wind directions.
     Rows with no values greater than 0 are trimmed before plotting.
 
     :param wind_data: the wind matrix data as a DataFrame (values are proportions of wind observations)
     :param ws_units: the wind speed units - Options: ['kph', 'mph']
     :param dir_bins: the list of direction bins (angles in degrees)
     :param out_path: path to save the wind rose figure (optional)
-    :param colormap: the colormap to use for the wind rose (default: 'viridis')
-    :param lightness_factor: factor to adjust the lightness of the colormap (default: 1.5 to lighten)
+    :param colormap: the colormap to use for the wind rose (default: 'viridis') (optional)
+    :param lightness_factor: factor to adjust the lightness of the colormap (default: 1.5 to lighten) (optional)
     :return: None
     """
     # Remove rows where all values are zero
@@ -153,7 +225,7 @@ def genWindRose(wind_data: pd.DataFrame,
     directions_rad = np.radians(dir_bins)
 
     # Dynamically calculate the width of each bar based on the number of directions
-    bar_width = (2 * np.pi / len(dir_bins)) - 0.05 * (2 * np.pi / len(dir_bins)) # The total circle is 2π radians
+    bar_width = (2 * np.pi / len(dir_bins)) - 0.05 * (2 * np.pi / len(dir_bins))  # The total circle is 2π radians
 
     # Create a colormap for wind speeds
     cmap = _adjust_colormap_lightness(colormap, factor=lightness_factor)  # Adjust the lightness of the colormap
