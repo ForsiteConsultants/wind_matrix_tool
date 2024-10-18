@@ -83,6 +83,7 @@ def genWindMatrix(out_path: str,
 
     if gen_wind_rose:
         genWindRose(wind_data=wind_df,
+                    ws_units=ws_units,
                     dir_bins=dir_labels[1:],
                     out_path=out_path.replace('.csv', '.png'))
 
