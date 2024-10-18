@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
+from matplotlib.colors import LinearSegmentedColormap
 
 
 def genWindMatrix(out_path: str,
@@ -93,7 +94,8 @@ def genWindMatrix(out_path: str,
     return
 
 
-def _adjust_colormap_lightness(cmap, factor=0.5):
+def _adjust_colormap_lightness(cmap: LinearSegmentedColormap,
+                               factor: float = 0.85) -> LinearSegmentedColormap:
     """
     Adjust the lightness of the colormap by multiplying the lightness values by the factor.
     A factor < 1 will darken the colormap, and a factor > 1 will lighten it.
