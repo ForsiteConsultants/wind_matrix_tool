@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
-from typing import Union, Optional
+from typing import Optional
 
 
 def calcWindSpeedPercentilesByDirection(ws_array: np.ndarray,
