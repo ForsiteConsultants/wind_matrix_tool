@@ -16,8 +16,9 @@ from typing import Optional
 
 def calcWindSpeedPercentilesByDirection(ws_array: np.ndarray,
                                        wd_array: np.ndarray,
-                                       percentiles: list,
-                                       wd_bin_width: int = 45,
+                                       percentiles: list[int],
+                                       season: str,
+                                       wd_bin_width: int = 5,
                                        out_path: Optional[str] = None) -> pd.DataFrame:
     """
     Function to calculate wind speed percentiles for winds that are grouped by direction.
@@ -28,20 +29,18 @@ def calcWindSpeedPercentilesByDirection(ws_array: np.ndarray,
     :param percentiles: a list of percentile values to calculate
     :param wd_bin_width: the width/size (number of degrees) used for the wind direction bins
     :param out_path: optional, the path to save the output CSV file
+    :param season: optional, the season label to include in the output
     :return: a Pandas DataFrame with wind speed percentiles for each wind direction bin
     """
     # Check that the input arrays have matching dimensions
     if len(ws_array) != len(wd_array):
         raise ValueError("Wind speed and wind direction arrays must have the same length.")
 
-    # Calculate the wind direction bins using the provided formula
-    bin_labels = [val for val in range(0, 360 + wd_bin_width, wd_bin_width)]
-    bins = ([0] +
-            [int((x * wd_bin_width) / 2) for x in range(1, int(360 / wd_bin_width) * 2)
-             if int((x * wd_bin_width) / 2) % wd_bin_width != 0] +
-            [360])
+    # Define wind direction bins and labels
+    bins = np.arange(0, 360 + wd_bin_width, wd_bin_width)
+    bin_labels = [f'wd_{int(val)}' for val in bins[:-1]]
 
-    # Create a DataFrame from the input arrays
+    # Create DataFrame from the input arrays
     df = pd.DataFrame({
         'wind_speed': ws_array,
         'wind_direction': wd_array
@@ -54,25 +53,29 @@ def calcWindSpeedPercentilesByDirection(ws_array: np.ndarray,
                                       right=False,
                                       include_lowest=True)
 
-    # Group by wind direction bins and calculate the requested percentiles for wind speeds
-    result = df.groupby('wind_direction_bin',
-                        observed=True)['wind_speed'].quantile([p / 100 for p in percentiles]).unstack()
+    # Calculate the percentiles for each wind direction bin
+    result_list = []
+    for percentile in percentiles:
+        percentile_df = (
+            df.groupby('wind_direction_bin', observed=True)['wind_speed']
+            .quantile(percentile / 100)
+            .reindex(bins[:-1])
+            .fillna(0)
+        )
+        percentile_df.name = f"{percentile}"
+        result_list.append(percentile_df)
 
-    # Rename columns to reflect the percentiles
-    result.columns = [f'{int(p)}th_percentile' for p in percentiles]
+    # Concatenate results and format DataFrame
+    result = pd.concat(result_list, axis=1).T
+    result.columns = bin_labels
 
-    # Replace the index with the bin labels
-    result.index = bin_labels
-
-    # Merge the first bin (0°) with the last bin (360°)
-    # Since 0 and 360 are the same direction, we'll combine the bins
-    if 0 in result.index and 360 in result.index:
-        result.loc[360] += result.loc[0]
-        result = result.drop(0)  # Remove the redundant 360° bin
+    # Add season and percentile as separate columns
+    result.insert(0, 'season', season)
+    result.insert(1, 'percentile', percentiles)
 
     # If an output path is provided, save the result to a CSV file
     if out_path:
-        result.to_csv(out_path)
+        result.to_csv(out_path, index=False)
 
     return result
 
