@@ -196,6 +196,7 @@ def _adjust_colormap_lightness(cmap: LinearSegmentedColormap,
 def genWindRose(wind_data: pd.DataFrame,
                 ws_units: str,
                 dir_bins: list,
+                fig_title: str = 'Proportion of Wind Observations by Speed and Direction',
                 out_path: Optional[str] = '',
                 colormap: Optional[str] = 'Blues',
                 lightness_factor: Optional[float] = 0.85) -> None:
@@ -207,6 +208,8 @@ def genWindRose(wind_data: pd.DataFrame,
     :param wind_data: the wind matrix data as a DataFrame (values are proportions of wind observations)
     :param ws_units: the wind speed units - Options: ['kph', 'mph']
     :param dir_bins: the list of direction bins (angles in degrees)
+    :param fig_title: the title to apply to the figure (optional).
+        Default: Proportion of Wind Observations by Speed and Direction
     :param out_path: path to save the wind rose figure (optional)
     :param colormap: the colormap to use for the wind rose (default: 'viridis') (optional)
     :param lightness_factor: factor to adjust the lightness of the colormap (default: 1.5 to lighten) (optional)
@@ -275,7 +278,7 @@ def genWindRose(wind_data: pd.DataFrame,
 
     # Add legend and title without zorder in the legend
     ax.legend(title=f'Wind Speed ({ws_units})', bbox_to_anchor=(1.1, 1.05))
-    ax.set_title('Proportion of Wind Observations by Speed and Direction', zorder=3)
+    ax.set_title(fig_title, zorder=3)
 
     # Save or display the plot
     if out_path:
