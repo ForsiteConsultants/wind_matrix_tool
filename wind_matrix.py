@@ -88,6 +88,7 @@ def genWindMatrix(ws_array: np.ndarray,
                   dir_labels: Optional[list] = None,
                   out_matrix: str = '',
                   gen_wind_rose: bool = False,
+                  plot_title: str = 'Proportion of Wind Observations by Speed and Direction',
                   out_rose: str = '') -> pd.DataFrame:
     """
     Function to generate a wind matrix from wind speed and direction data
@@ -100,6 +101,8 @@ def genWindMatrix(ws_array: np.ndarray,
     :param out_matrix: path to save the wind matrix as a csv (optional).
         If no path is provided, a wind matrix csv will not be generated.
     :param gen_wind_rose: if True, a wind rose plot will be generated (optional)
+    :param plot_title: the title to apply to the wind rose plot (optional).
+        Default: Proportion of Wind Observations by Speed and Direction
     :param out_rose: the path to save the wind rose plot (optional).
         Plot extension options: ['.png', '.pdf', '.svg', '.ps', '.eps', '.jpg', '.tif/.tiff']
     :return: a Pandas Dataframe of the results
@@ -164,6 +167,7 @@ def genWindMatrix(ws_array: np.ndarray,
         genWindRose(wind_data=wind_df,
                     ws_units=ws_units,
                     dir_bins=dir_labels,
+                    plot_title=plot_title,
                     out_path=out_rose)
 
     return wind_df
@@ -196,7 +200,7 @@ def _adjust_colormap_lightness(cmap: LinearSegmentedColormap,
 def genWindRose(wind_data: pd.DataFrame,
                 ws_units: str,
                 dir_bins: list,
-                fig_title: str = 'Proportion of Wind Observations by Speed and Direction',
+                plot_title: str = '',
                 out_path: Optional[str] = '',
                 colormap: Optional[str] = 'Blues',
                 lightness_factor: Optional[float] = 0.85) -> None:
@@ -208,8 +212,7 @@ def genWindRose(wind_data: pd.DataFrame,
     :param wind_data: the wind matrix data as a DataFrame (values are proportions of wind observations)
     :param ws_units: the wind speed units - Options: ['kph', 'mph']
     :param dir_bins: the list of direction bins (angles in degrees)
-    :param fig_title: the title to apply to the figure (optional).
-        Default: Proportion of Wind Observations by Speed and Direction
+    :param plot_title: the title to apply to the wind rose plot (optional).
     :param out_path: path to save the wind rose figure (optional)
     :param colormap: the colormap to use for the wind rose (default: 'viridis') (optional)
     :param lightness_factor: factor to adjust the lightness of the colormap (default: 1.5 to lighten) (optional)
@@ -278,7 +281,7 @@ def genWindRose(wind_data: pd.DataFrame,
 
     # Add legend and title without zorder in the legend
     ax.legend(title=f'Wind Speed ({ws_units})', bbox_to_anchor=(1.1, 1.05))
-    ax.set_title(fig_title, zorder=3)
+    ax.set_title(plot_title, zorder=3)
 
     # Save or display the plot
     if out_path:
