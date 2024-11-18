@@ -111,6 +111,9 @@ def genWindMatrix(ws_array: np.ndarray,
     if dir_labels is None:
         dir_labels = [x for x in range(0, 360 + wd_bin_width, wd_bin_width)][1:]
     dir_bins = [int((x * wd_bin_width) / 2) for x in range(0, 1 + int(360 / wd_bin_width) * 2)]
+    dir_bins = [d for d in dir_bins if d not in dir_labels]
+    if 360 not in dir_bins:
+        dir_bins  += [360]
 
     # Y-axis bins/labels (wind speed)
     if ws_units == 'mph':
@@ -136,10 +139,10 @@ def genWindMatrix(ws_array: np.ndarray,
         wnd_spd = [float(i[0]) for i in wnd_array]  # Re-separate wind speed values
 
     # Bin all wind speed/direction counts in histogram
-    H, spd_bins, dir_bins = np.histogram2d(wnd_spd, wnd_dir, bins=((spd_bins, dir_bins)))
-    # Add values from first column (22 degrees) to last column (360 degrees)
+    H, spd_bins, dir_bins = np.histogram2d(wnd_spd, wnd_dir, bins=(spd_bins, dir_bins))
+    # Add values from first column to last column (360 degrees)
     H[:, -1] += H[:, 0]
-    # Drop first column (22 degrees)
+    # Drop first column
     H = np.delete(H, 0, 1)
     # Add new histogram counts to histogram counts in wind_array
     wind_array = np.add(wind_array, H)
